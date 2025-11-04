@@ -23,7 +23,11 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+// Importamos los nuevos elementos de la UI
+import android.widget.Button;
+import android.widget.NumberPicker;
 import android.widget.TextView;
+import android.widget.TimePicker;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -40,15 +44,21 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private String deviceAddress;
     private SerialService service;
 
-    private TextView receiveText;
-    private TextView sendText;
-    private TextUtil.HexWatcher hexWatcher;
+    // --- Elementos de UI Antiguos (Eliminados) ---
+    // private TextView receiveText;
+    // private TextView sendText;
+    // private TextUtil.HexWatcher hexWatcher;
+
+    // --- NUEVOS Elementos de UI ---
+    private TimePicker alarmTimePicker;
+    private NumberPicker waitTimePicker;
+    private Button setAlarmButton;
+    private Button stopButton;
 
     private Connected connected = Connected.False;
     private boolean initialStart = true;
-    private boolean hexEnabled = false;
-    private boolean pendingNewline = false;
-    private String newline = TextUtil.newline_crlf;
+    // private boolean hexEnabled = false; // Ya no necesitamos esto
+    // private String newline = TextUtil.newline_crlf; // Ya no necesitamos esto
 
     /*
      * Lifecycle
@@ -127,61 +137,72 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
      */
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        // Usamos el layout que modificaste (fragment_terminal.xml)
         View view = inflater.inflate(R.layout.fragment_terminal, container, false);
-        receiveText = view.findViewById(R.id.receive_text);                          // TextView performance decreases with number of spans
-        receiveText.setTextColor(getResources().getColor(R.color.colorRecieveText)); // set as default color to reduce number of spans
-        receiveText.setMovementMethod(ScrollingMovementMethod.getInstance());
 
-        sendText = view.findViewById(R.id.send_text);
-        hexWatcher = new TextUtil.HexWatcher(sendText);
-        hexWatcher.enable(hexEnabled);
-        sendText.addTextChangedListener(hexWatcher);
-        sendText.setHint(hexEnabled ? "HEX mode" : "");
+        // --- Buscamos los NUEVOS elementos ---
+        alarmTimePicker = view.findViewById(R.id.alarm_time_picker);
+        waitTimePicker = view.findViewById(R.id.wait_time_picker);
+        setAlarmButton = view.findViewById(R.id.set_alarm_button);
+        stopButton = view.findViewById(R.id.stop_button);
 
-        View sendBtn = view.findViewById(R.id.send_btn);
-        sendBtn.setOnClickListener(v -> send(sendText.getText().toString()));
+        // --- Configuración Inicial ---
+        alarmTimePicker.setIs24HourView(true); // Formato 24h
+        
+        // Configurar el NumberPicker
+        waitTimePicker.setMinValue(0);
+        waitTimePicker.setMaxValue(30);
+        waitTimePicker.setValue(5); // Valor por defecto de 5 minutos
+
+        // --- Lógica de los Botones ---
+        setAlarmButton.setOnClickListener(v -> setAlarm());
+        stopButton.setOnClickListener(v -> send("STOP"));
+        
         return view;
+    }
+
+    // --- Lógica de la Alarma (Paso 1: Solo enviar comando) ---
+    private void setAlarm() {
+        // TODO: En el futuro, aquí programaremos la alarma del sistema.
+        // Por AHORA, para probar, enviaremos el comando "START X" inmediatamente.
+
+        int waitMinutes = waitTimePicker.getValue();
+        String command = "START " + waitMinutes;
+        
+        // Obtenemos la hora (por ahora solo para mostrarla)
+        int hour = 0;
+        int minute = 0;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            hour = alarmTimePicker.getHour();
+            minute = alarmTimePicker.getMinute();
+        } else {
+            hour = alarmTimePicker.getCurrentHour();
+            minute = alarmTimePicker.getCurrentMinute();
+        }
+        String timeString = String.format("%02d:%02d", hour, minute);
+
+        Toast.makeText(getActivity(), "Enviando comando: " + command, Toast.LENGTH_SHORT).show();
+        send(command);
+        
+        // Aquí es donde irá la lógica del AlarmManager
+        // scheduleRealAlarm(hour, minute, command); 
     }
 
     @Override
     public void onCreateOptionsMenu(@NonNull Menu menu, MenuInflater inflater) {
         inflater.inflate(R.menu.menu_terminal, menu);
-    }
-
-    public void onPrepareOptionsMenu(@NonNull Menu menu) {
-        menu.findItem(R.id.hex).setChecked(hexEnabled);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            menu.findItem(R.id.backgroundNotification).setChecked(service != null && service.areNotificationsEnabled());
-        } else {
-            menu.findItem(R.id.backgroundNotification).setChecked(true);
-            menu.findItem(R.id.backgroundNotification).setEnabled(false);
-        }
+        // Ocultamos los botones que ya no usamos
+        // menu.findItem(R.id.hex).setVisible(false);
+        // menu.findItem(R.id.newline).setVisible(false);
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
         if (id == R.id.clear) {
-            receiveText.setText("");
-            return true;
-        } else if (id == R.id.newline) {
-            String[] newlineNames = getResources().getStringArray(R.array.newline_names);
-            String[] newlineValues = getResources().getStringArray(R.array.newline_values);
-            int pos = java.util.Arrays.asList(newlineValues).indexOf(newline);
-            AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-            builder.setTitle("Newline");
-            builder.setSingleChoiceItems(newlineNames, pos, (dialog, item1) -> {
-                newline = newlineValues[item1];
-                dialog.dismiss();
-            });
-            builder.create().show();
-            return true;
-        } else if (id == R.id.hex) {
-            hexEnabled = !hexEnabled;
-            sendText.setText("");
-            hexWatcher.enable(hexEnabled);
-            sendText.setHint(hexEnabled ? "HEX mode" : "");
-            item.setChecked(hexEnabled);
+            // "Clear" ahora puede significar enviar "STOP"
+            Toast.makeText(getActivity(), "Enviando STOP...", Toast.LENGTH_SHORT).show();
+            send("STOP");
             return true;
         } else if (id == R.id.backgroundNotification) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -204,7 +225,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         try {
             BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
             BluetoothDevice device = bluetoothAdapter.getRemoteDevice(deviceAddress);
-            status("connecting...");
+            status("conectando...");
             connected = Connected.Pending;
             SerialSocket socket = new SerialSocket(getActivity().getApplicationContext(), device);
             service.connect(socket);
@@ -218,65 +239,36 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         service.disconnect();
     }
 
+    // --- FUNCIÓN SEND (SIMPLIFICADA) ---
+    // Esta es la función que envía el comando a la RPi
     private void send(String str) {
         if(connected != Connected.True) {
-            Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getActivity(), "no conectado", Toast.LENGTH_SHORT).show();
             return;
         }
         try {
-            String msg;
-            byte[] data;
-            if(hexEnabled) {
-                StringBuilder sb = new StringBuilder();
-                TextUtil.toHexString(sb, TextUtil.fromHexString(str));
-                TextUtil.toHexString(sb, newline.getBytes());
-                msg = sb.toString();
-                data = TextUtil.fromHexString(msg);
-            } else {
-                msg = str;
-                data = (str + newline).getBytes();
-            }
-            SpannableStringBuilder spn = new SpannableStringBuilder(msg + '\n');
-            spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorSendText)), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            receiveText.append(spn);
+            // Añadimos un salto de línea "\n" para que bluedot lo reconozca
+            String msg = str + "\n";
+            byte[] data = msg.getBytes();
             service.write(data);
         } catch (Exception e) {
             onSerialIoError(e);
         }
     }
 
+    // --- FUNCIONES RECEIVE y STATUS (MODIFICADAS) ---
+    // Ya no tenemos el 'receiveText', así que solo imprimimos a la consola
     private void receive(ArrayDeque<byte[]> datas) {
-        SpannableStringBuilder spn = new SpannableStringBuilder();
         for (byte[] data : datas) {
-            if (hexEnabled) {
-                spn.append(TextUtil.toHexString(data)).append('\n');
-            } else {
-                String msg = new String(data);
-                if (newline.equals(TextUtil.newline_crlf) && msg.length() > 0) {
-                    // don't show CR as ^M if directly before LF
-                    msg = msg.replace(TextUtil.newline_crlf, TextUtil.newline_lf);
-                    // special handling if CR and LF come in separate fragments
-                    if (pendingNewline && msg.charAt(0) == '\n') {
-                        if(spn.length() >= 2) {
-                            spn.delete(spn.length() - 2, spn.length());
-                        } else {
-                            Editable edt = receiveText.getEditableText();
-                            if (edt != null && edt.length() >= 2)
-                                edt.delete(edt.length() - 2, edt.length());
-                        }
-                    }
-                    pendingNewline = msg.charAt(msg.length() - 1) == '\r';
-                }
-                spn.append(TextUtil.toCaretString(msg, newline.length() != 0));
-            }
+            String msg = new String(data);
+            System.out.println("BT_RECEIVE: " + msg);
         }
-        receiveText.append(spn);
     }
 
     private void status(String str) {
-        SpannableStringBuilder spn = new SpannableStringBuilder(str + '\n');
-        spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorStatusText)), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        receiveText.append(spn);
+        // En lugar de escribir en la app, mostramos un "Toast"
+        Toast.makeText(getActivity(), str, Toast.LENGTH_SHORT).show();
+        System.out.println("BT_STATUS: " + str);
     }
 
     /*
@@ -302,13 +294,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
      */
     @Override
     public void onSerialConnect() {
-        status("connected");
+        status("¡Conectado!");
         connected = Connected.True;
     }
 
     @Override
     public void onSerialConnectError(Exception e) {
-        status("connection failed: " + e.getMessage());
+        status("Conexión fallida: " + e.getMessage());
         disconnect();
     }
 
@@ -325,8 +317,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onSerialIoError(Exception e) {
-        status("connection lost: " + e.getMessage());
+        status("Conexión perdida: " + e.getMessage());
         disconnect();
     }
-
 }

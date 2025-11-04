@@ -1,23 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:android="http://schemas.android.com/apk/res/android">
+    
+    <!-- Dejamos el botón de 'Clear', que ahora usaremos para 'STOP' -->
     <item
         android:id="@+id/clear"
         android:icon="@drawable/ic_delete_white_24dp"
-        android:title="Clear"
+        android.title="STOP"
         app:showAsAction="always" />
-    <item
-        android:id="@+id/newline"
-        android:title="Newline"
-        app:showAsAction="never" />
-    <item
-        android:id="@+id/hex"
-        android:title="HEX Mode"
-        android:checkable="true"
-        app:showAsAction="never" />
+    
+    <!-- Dejamos el de Notificación de Fondo -->
     <item
         android:id="@+id/backgroundNotification"
-        android:title="Notification if App in background"
+        android:title="Notificación en segundo plano"
         android:checkable="true"
         app:showAsAction="never" />
+
+    <!-- Elementos 'newline' y 'hex' eliminados -->
 </menu>
