@@ -78,6 +78,29 @@ public class SerialService extends Service implements SerialListener {
         return binder;
     }
 
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && Constants.INTENT_ACTION_SEND.equals(intent.getAction())) {
+            String command = intent.getStringExtra("command");
+            if (command != null) {
+                // Preparamos el comando para enviarlo (con salto de línea)
+                String msg = command + "\n";
+                try {
+                    if (connected) {
+                        write(msg.getBytes());
+                    } else {
+                        // Opcional: Manejar caso donde la alarma suena
+                        // pero ya no estamos conectados.
+                        // Por ahora, solo lo intentará si 'connected' es true.
+                    }
+                } catch (IOException e) {
+                    // Manejar error
+                }
+            }
+        }
+        return super.onStartCommand(intent, flags, startId);
+    }
+
     /**
      * Api
      */

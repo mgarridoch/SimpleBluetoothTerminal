@@ -4,6 +4,7 @@ class Constants {
 
     // values have to be globally unique
     static final String INTENT_ACTION_DISCONNECT = BuildConfig.APPLICATION_ID + ".Disconnect";
+    static final String INTENT_ACTION_SEND = BuildConfig.APPLICATION_ID + ".Send";
     static final String NOTIFICATION_CHANNEL = BuildConfig.APPLICATION_ID + ".Channel";
     static final String INTENT_CLASS_MAIN_ACTIVITY = BuildConfig.APPLICATION_ID + ".MainActivity";
 
